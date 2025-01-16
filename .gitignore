@@ -1,0 +1,6 @@
+zig-*
+qemu/
+build/
+iotest.dump
+iotest.readelf
+log.txt
