@@ -1,8 +1,8 @@
 zig-macos-aarch64-0.14.0-dev.2643+fb43e91b2.tar.xz
 zig-macos-aarch64-0.14.0-dev.2643+fb43e91b2/*
-!zig-macos-aarch64-0.14.0-dev.2643+fb43e91b2/zig.patch
+!zig-macos-aarch64-0.14.0-dev.2643+fb43e91b2/zig.diff
 qemu/*
-!qemu/qemu.patch
+!qemu/qemu.diff
 build/
 iotest.dump
 iotest.readelf
