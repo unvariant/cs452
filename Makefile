@@ -16,12 +16,14 @@ CFLAGS:=-O2 -pipe -static -mstrict-align -ffreestanding -mgeneral-regs-only \
 LDFLAGS:=-Wl,-T,linker.ld -nostartfiles
 
 BUILD=./build/
+# Root zig source file
+ZIG_SOURCE_ROOT=bootstrap
 # Source files and include dirs
 SOURCES := $(wildcard *.c) $(wildcard *.S)
 # Create .o and .d files for every .cc and .S (hand-written assembly) file
 # OBJECTS := $(patsubst %.c, $(BUILD)/%.o, $(patsubst %.S, $(BUILD)/%.o, $(patsubst %.zig, $(BUILD)/%.o, $(SOURCES))))
-OBJECTS := $(patsubst %.c, $(BUILD)/%.o, $(patsubst %.S, $(BUILD)/%.o, $(SOURCES))) $(BUILD)/main.o
-DEPENDS := $(patsubst %.c, %.d, $(patsubst %.S, %.d, $(SOURCES))) $(BUILD)/main.d
+OBJECTS := $(patsubst %.c, $(BUILD)/%.o, $(patsubst %.S, $(BUILD)/%.o, $(SOURCES))) $(BUILD)/$(ZIG_SOURCE_ROOT).o
+DEPENDS := $(patsubst %.c, %.d, $(patsubst %.S, %.d, $(SOURCES))) $(BUILD)/$(ZIG_SOURCE_ROOT).d
 
 # The first rule is the default, ie. "make", "make all" and "make kernal8.img" mean the same
 all: iotest.img
@@ -42,7 +44,7 @@ $(BUILD)/%.o: %.c Makefile
 $(BUILD)/%.o: %.S Makefile
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
-$(BUILD)/main.o: main.zig Makefile
+$(BUILD)/$(ZIG_SOURCE_ROOT).o: $(ZIG_SOURCE_ROOT).zig Makefile
 	$(ZIG) build-obj \
 		-target aarch64-freestanding-none \
 		-mcpu=$(ARCH)-neon-fp_armv8-fullfp16 \

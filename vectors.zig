@@ -4,6 +4,8 @@ const tasks = @import("tasks.zig");
 const sys = @import("sys.zig");
 
 pub const Context = extern struct {
+    user_stack: u64,
+    nothing: u64,
     // exception syndrome register (esr)
     exception_reason: u64,
     // fault address register (far)
@@ -17,9 +19,8 @@ pub const Context = extern struct {
     // general purpose registers
     // restored on task switch
     general: [31]u64,
-    // saved stack pointer
-    // restored on task switch
-    exception_stack: u64,
+    // scratch space
+    scratch: u64,
 };
 
 // zig fmt: off
@@ -54,16 +55,11 @@ const ExceptionClass = enum(u6) {
 };
 // zig fmt: on
 
-export fn generic_vector_handler(context: *Context, index: u64) callconv(.C) void {
-    zig_generic_vector_handler(context, index);
-}
+var hits: u32 = 0;
 
-var nested_data_abort: u32 = 0;
-
-fn zig_generic_vector_handler(context: *Context, index: u64) void {
-    _ = index;
-
+export fn zig_exception_handler(context: *Context) void {
     const console = uart.channel(uart.CHANNEL1);
+
     // See page D10.2.39 (pg 2436) of ref 1
     // Format of Exception Syndrome Register (exception_reason)
     // | 31..26 | 25 | 24..0 |
@@ -75,42 +71,43 @@ fn zig_generic_vector_handler(context: *Context, index: u64) void {
     //  - IL = 1 for 32 bit instructions (ARM and ARM64)
     // Instruction Specific Syndrome
     //  - extra information about the exception
-
     const reason_raw = context.exception_reason >> 26;
     const reason: ExceptionClass = @enumFromInt(reason_raw);
+    // const index = (std.mem.alignBackward(u64, context.scratch, 0x80) - @intFromPtr(&__vector_table)) / 0x80;
+    // try console.print("index({}): {b} ({s})\r\n", .{ index, reason_raw, @tagName(reason) });
+    // try console.print("spsr = {b}\r\n", .{context.program_status});
+
+    var syscall_result: ?i64 = null;
     switch (reason) {
-        .DataAbortFromSameRing, .DataAbortFromLowerRing => {
+        .DataAbortFromSameRing => {
+            try console.print("same ring fault\r\n", .{});
             try console.print("fault address = 0x{x}\r\n", .{context.fault_address});
             try console.print("exception return = 0x{x}\r\n", .{context.exception_return});
-            if (nested_data_abort >= 1) @panic("nested abort");
-            nested_data_abort += 1;
+            @panic("abort");
+        },
+        .DataAbortFromLowerRing => {
+            try console.print("lower ring fault\r\n", .{});
+            try console.print("fault address = 0x{x}\r\n", .{context.fault_address});
+            try console.print("exception return = 0x{x}\r\n", .{context.exception_return});
             @panic("abort");
         },
         .SupervisorCall64 => {
             const nr = context.general[8];
             const args: []const u64 = context.general[0..8];
-            _ = sys.handle_syscall(nr, args);
+            syscall_result = sys.handle_syscall(nr, args);
         },
         else => {},
     }
 
-    const name = @tagName(reason);
-    try console.print("exception: {b} ({s})\r\n", .{ reason_raw, name });
-
+    if (syscall_result) |result| {
+        // write syscall result back to the return register
+        context.general[0] = @bitCast(result);
+    }
     tasks.save(context);
-
     const task = tasks.schedule();
-    context.exception_return = task.context.exception_return;
-    context.exception_stack = task.context.exception_stack;
-    context.program_status = task.context.program_status;
-    context.general = task.context.general;
 
-    switch (reason) {
-        .DataAbortFromSameRing => {
-            nested_data_abort -= 1;
-        },
-        else => {},
-    }
+    context.* = task.context;
+    // try console.print("returning to 0x{x}\r\n", .{context.exception_return});
 }
 
 extern const __vector_table: u8;
