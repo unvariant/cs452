@@ -7,26 +7,30 @@ OBJCOPY:=$(TRIPLE)-objcopy
 OBJDUMP:=$(TRIPLE)-objdump
 
 # COMPILE OPTIONS
+BUILD=./build/
+SOURCE_DIR=./src/
 WARNINGS=-Wall -Wextra -Wpedantic -Wno-unused-const-variable
 CFLAGS:=-O2 -pipe -static -mstrict-align -ffreestanding -mgeneral-regs-only \
 	-mcpu=$(ARCH)-neon-fp_armv8-fullfp16 $(WARNINGS) -fno-stack-protector -nostdlib
 
 # -Wl,option tells g++ to pass 'option' to the linker with commas replaced by spaces
 # doing this rather than calling the linker directly simplifies the compilation procedure
-LDFLAGS:=-Wl,-T,linker.ld -nostartfiles
+LDFLAGS:=-Wl,-T,$(SOURCE_DIR)/linker.ld -nostartfiles
 
-BUILD=./build/
 # Root zig source file
-ZIG_SOURCE_ROOT=bootstrap
+ZIG_SOURCE_ROOT=$(SOURCE_DIR)/bootstrap
 # Source files and include dirs
-SOURCES := $(wildcard *.c) $(wildcard *.S)
+SOURCES := $(wildcard $(SOURCE_DIR)/*.c) $(wildcard $(SOURCE_DIR)/*.S)
 # Create .o and .d files for every .cc and .S (hand-written assembly) file
 # OBJECTS := $(patsubst %.c, $(BUILD)/%.o, $(patsubst %.S, $(BUILD)/%.o, $(patsubst %.zig, $(BUILD)/%.o, $(SOURCES))))
 OBJECTS := $(patsubst %.c, $(BUILD)/%.o, $(patsubst %.S, $(BUILD)/%.o, $(SOURCES))) $(BUILD)/$(ZIG_SOURCE_ROOT).o
 DEPENDS := $(patsubst %.c, %.d, $(patsubst %.S, %.d, $(SOURCES))) $(BUILD)/$(ZIG_SOURCE_ROOT).d
 
 # The first rule is the default, ie. "make", "make all" and "make kernal8.img" mean the same
-all: iotest.img
+all: build iotest.img
+
+build:
+	mkdir -p build/src
 
 clean:
 	-rm -f $(BUILD)/*
@@ -34,7 +38,7 @@ clean:
 iotest.img: $(BUILD)/iotest.elf
 	$(OBJCOPY) $< -O binary $(BUILD)/$@
 
-$(BUILD)/iotest.elf: $(OBJECTS) linker.ld
+$(BUILD)/iotest.elf: $(OBJECTS) $(SOURCE_DIR)/linker.ld
 	$(CC) $(CFLAGS) $(filter-out %.ld, $^) -o $@ $(LDFLAGS)
 	@$(OBJDUMP) -d $@ | grep -Fq q0 && printf "\n***** WARNING: SIMD DETECTED! *****\n\n" || true
 
@@ -50,7 +54,7 @@ $(BUILD)/$(ZIG_SOURCE_ROOT).o: $(ZIG_SOURCE_ROOT).zig Makefile
 		-mcpu=$(ARCH)-neon-fp_armv8-fullfp16 \
 		-static \
 		-O Debug \
-		-I . \
+		-I ./src \
 		$< -femit-bin=$@
 
 -include $(DEPENDS)
