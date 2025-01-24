@@ -58,8 +58,6 @@ const ExceptionClass = enum(u6) {
 var hits: u32 = 0;
 
 export fn zig_exception_handler(context: *Context) void {
-    const console = uart.channel(uart.CHANNEL1);
-
     // See page D10.2.39 (pg 2436) of ref 1
     // Format of Exception Syndrome Register (exception_reason)
     // | 31..26 | 25 | 24..0 |
@@ -74,27 +72,27 @@ export fn zig_exception_handler(context: *Context) void {
     const reason_raw = context.exception_reason >> 26;
     const reason: ExceptionClass = @enumFromInt(reason_raw);
     // const index = (std.mem.alignBackward(u64, context.scratch, 0x80) - @intFromPtr(&__vector_table)) / 0x80;
-    // try console.print("index({}): {b} ({s})\r\n", .{ index, reason_raw, @tagName(reason) });
-    // try console.print("spsr = {b}\r\n", .{context.program_status});
+    // try uart.con.print("index({}): {b} ({s})\r\n", .{ index, reason_raw, @tagName(reason) });
+    // try uart.con.print("spsr = {b}\r\n", .{context.program_status});
 
     var syscall_result: ?i64 = null;
     switch (reason) {
         .DataAbortFromSameRing => {
-            try console.print("same ring fault\r\n", .{});
-            try console.print("fault address = 0x{x}\r\n", .{context.fault_address});
-            try console.print("exception return = 0x{x}\r\n", .{context.exception_return});
+            try uart.con.print("same ring fault\r\n", .{});
+            try uart.con.print("fault address = 0x{x}\r\n", .{context.fault_address});
+            try uart.con.print("exception return = 0x{x}\r\n", .{context.exception_return});
             @panic("abort");
         },
         .DataAbortFromLowerRing => {
-            try console.print("lower ring fault\r\n", .{});
-            try console.print("fault address = 0x{x}\r\n", .{context.fault_address});
-            try console.print("exception return = 0x{x}\r\n", .{context.exception_return});
+            try uart.con.print("lower ring fault\r\n", .{});
+            try uart.con.print("fault address = 0x{x}\r\n", .{context.fault_address});
+            try uart.con.print("exception return = 0x{x}\r\n", .{context.exception_return});
             @panic("abort");
         },
         .SupervisorCall64 => {
             const nr = context.general[8];
             const args: []const u64 = context.general[0..8];
-            syscall_result = sys.handle_syscall(nr, args);
+            syscall_result = sys.handle(nr, args);
         },
         else => {},
     }
@@ -107,7 +105,7 @@ export fn zig_exception_handler(context: *Context) void {
     const task = tasks.schedule();
 
     context.* = task.context;
-    // try console.print("returning to 0x{x}\r\n", .{context.exception_return});
+    // try uart.con.print("returning to 0x{x}\r\n", .{context.exception_return});
 }
 
 extern const __vector_table: u8;

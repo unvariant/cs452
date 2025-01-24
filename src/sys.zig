@@ -1,9 +1,7 @@
 const tasks = @import("tasks.zig");
-const uart = @import("uart.zig");
 
 const Tid = tasks.Tid;
-
-const console = uart.channel(uart.CHANNEL1);
+const Priority = tasks.Priority;
 
 pub const Error = error{
     InvalidPriority,
@@ -11,6 +9,56 @@ pub const Error = error{
     TaskDoesNotExist,
     TaskNotReplyBlocked,
 };
+
+pub const Call = enum {
+    Create,
+    MyTid,
+    MyParentTid,
+    Yield,
+    Exit,
+    Send,
+    Recv,
+    Reply,
+};
+
+pub fn handle(nr: u64, args: []const u64) ?i64 {
+    const call: Call = @enumFromInt(nr);
+    // try console.print("call = {s}\r\n", .{@tagName(call)});
+    switch (call) {
+        .Create => {
+            const priority = args[0];
+            const start: tasks.Start = @ptrFromInt(args[1]);
+            return tasks.create(priority, start);
+        },
+        .MyTid => return @bitCast(tasks.current().tid()),
+        .MyParentTid => return @bitCast(tasks.current().ptid),
+        .Yield => return 0,
+        .Exit => {
+            tasks.exit(tasks.current().tid());
+            return null;
+        },
+        .Send => {
+            const tid = args[0];
+            const sendptr: [*]u8 = @ptrFromInt(args[1]);
+            const sendlen = args[2];
+            const recvptr: [*]u8 = @ptrFromInt(args[3]);
+            const recvlen = args[4];
+            return tasks.send(tid, sendptr[0..sendlen], recvptr[0..recvlen]);
+        },
+        .Recv => {
+            const tid: *Tid = @ptrFromInt(args[0]);
+            const recvptr: [*]u8 = @ptrFromInt(args[1]);
+            const recvlen = args[2];
+            return tasks.recv(tid, recvptr[0..recvlen]);
+        },
+        .Reply => {
+            const tid = args[0];
+            const replyptr: [*]u8 = @ptrFromInt(args[1]);
+            const replylen = args[2];
+            return tasks.reply(tid, replyptr[0..replylen]);
+        },
+    }
+}
 
 pub fn create(priority: tasks.Priority, start: tasks.Start) Error!Tid {
     const ret = syscall(.Create, .{ priority, start });
@@ -67,56 +115,6 @@ pub fn reply(tid: Tid, replybuf: []const u8) Error!usize {
         };
     }
     return @bitCast(ret);
-}
-
-const Call = enum {
-    Create,
-    MyTid,
-    MyParentTid,
-    Yield,
-    Exit,
-    Send,
-    Recv,
-    Reply,
-};
-
-pub fn handle_syscall(nr: u64, args: []const u64) ?i64 {
-    const call: Call = @enumFromInt(nr);
-    // try console.print("call = {s}\r\n", .{@tagName(call)});
-    switch (call) {
-        .Create => {
-            const priority = args[0];
-            const start: tasks.Start = @ptrFromInt(args[1]);
-            return tasks.create(priority, start);
-        },
-        .MyTid => return @bitCast(tasks.current().tid),
-        .MyParentTid => return @bitCast(tasks.current().ptid),
-        .Yield => return 0,
-        .Exit => {
-            tasks.exit(tasks.current().tid);
-            return null;
-        },
-        .Send => {
-            const tid = args[0];
-            const sendptr: [*]u8 = @ptrFromInt(args[1]);
-            const sendlen = args[2];
-            const recvptr: [*]u8 = @ptrFromInt(args[3]);
-            const recvlen = args[4];
-            return tasks.send(tid, sendptr[0..sendlen], recvptr[0..recvlen]);
-        },
-        .Recv => {
-            const tid: *Tid = @ptrFromInt(args[0]);
-            const recvptr: [*]u8 = @ptrFromInt(args[1]);
-            const recvlen = args[2];
-            return tasks.recv(tid, recvptr[0..recvlen]);
-        },
-        .Reply => {
-            const tid = args[0];
-            const replyptr: [*]u8 = @ptrFromInt(args[1]);
-            const replylen = args[2];
-            return tasks.reply(tid, replyptr[0..replylen]);
-        },
-    }
 }
 
 inline fn syscall(call: Call, args: anytype) i64 {

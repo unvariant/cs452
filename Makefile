@@ -31,6 +31,7 @@ all: build $(BUILD_DIR)/iotest.img
 
 build:
 	mkdir -p build/src
+	mkdir -p build/src/kernel
 
 clean:
 	-rm -rf $(BUILD_DIR)
@@ -53,7 +54,7 @@ $(BUILD_DIR)/$(ZIG_SOURCE_ROOT).o: $(ZIG_SOURCE_ROOT).zig Makefile
 		-target aarch64-freestanding-none \
 		-mcpu=$(ARCH)-neon-fp_armv8-fullfp16 \
 		-static \
-		-O Debug \
+		-O ReleaseSafe \
 		-I ./src \
 		$< -femit-bin=$@
 

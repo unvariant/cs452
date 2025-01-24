@@ -12,12 +12,17 @@
     //  - x0 .. x30
     //  - sp
     //  - LR is x30
+    // storing elr_el1
+    //  - address to return to after exception
     // storing spsr_el1
     //  - stores program flag states and some other information
-    // storing esr_el1
-    //  - stores the reason for the exception
+    //  - bits 3..0 of spsr determines the Exception level
     // storing far_el1
     //  - stores the virtual address for data abort, pc alignment faults, or watchpoint exceptions
+    // storing esr_el1
+    //  - stores the reason for the exception
+    // storing sp_el0
+    //  - userland stack pointer
 asm_exception_handler:
     // yes there is actually a register called CurrentEL
     // mrs x30, CurrentEL

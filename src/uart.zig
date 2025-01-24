@@ -2,6 +2,8 @@ const rpi = @cImport(@cInclude("rpi.h"));
 const std = @import("std");
 const Writer = std.io.Writer;
 
+pub const con = channel(CHANNEL1);
+
 const Error = error{};
 fn uart_write(line: usize, bytes: []const u8) Error!usize {
     for (bytes) |ch| {
@@ -13,6 +15,8 @@ fn uart_write(line: usize, bytes: []const u8) Error!usize {
 const UartWriter = Writer(usize, Error, uart_write);
 
 // these numbers are indices into the lines array in rpi.c
+//  - CHANNEL1 is uart 0
+//  - CHANNEL2 is uart 3
 pub const CHANNEL1: usize = 1;
 pub const CHANNEL2: usize = 2;
 pub fn channel(line: usize) UartWriter {
